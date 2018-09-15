@@ -1,0 +1,278 @@
+;-------------------------------------------------------------------------
+;
+; Startup ROM - execute * commands on startup
+;
+; Copyright (C) 2018 Tom Seddon
+; 
+; This program is free software: you can redistribute it and/or
+; modify it under the terms of the GNU General Public License as
+; published by the Free Software Foundation, either version 3 of the
+; License, or (at your option) any later version.
+; 
+; This program is distributed in the hope that it will be useful, but
+; WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+; General Public License for more details.
+; 
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see
+; <https://www.gnu.org/licenses/>.
+;
+;-------------------------------------------------------------------------
+
+; Set up C-style escape for CR.
+                .edef "\r",13
+
+; This one isn't strictly necessary, but my Emacs mode for 6502 source
+; code doesn't colourize single quoted apostrophes properly, and this
+; is a quick fix...
+                .edef "\'",$27
+
+;-------------------------------------------------------------------------
+
+gsinit=$ffc2
+gsread=$ffc5
+osargs=$ffda
+osnewl=$ffe7
+osrdch=$ffe0
+osasci=$ffe3
+oswrch=$ffee
+osword=$fff1
+osbyte=$fff4
+oscli=$fff7
+
+;-------------------------------------------------------------------------
+
+addr=$a8
+
+;-------------------------------------------------------------------------
+
+key=$ae                         ;S
+                
+;-------------------------------------------------------------------------
+
+                .dsection code
+*=ORIGIN
+                brk
+                brk
+                brk
+                jmp svc
+
+                .byte $82       ;has service entry
+                .byte rom_copyright&$ff
+                .byte 0         ;version
+rom_name:
+                .text "STARTUP"
+rom_version:
+                .text 0,VERSION
+rom_copyright:
+                .text 0,"(C)",0
+
+;-------------------------------------------------------------------------
+
+svc: .proc
+                cmp #3
+                beq svc_boot
+
+                cmp #9
+                beq svc_help
+done:
+                ldx $f4
+                rts
+                .pend
+
+;-------------------------------------------------------------------------
+
+svc_boot: .proc
+                pha
+                tya
+                pha
+
+                lda #$81        ;INKEY, AUG 153
+                ldx #key
+                ldy #$ff
+                jsr osbyte
+
+                cpx #$ff
+                beq booted      ;taken if key pressed
+
+                ldx #<oscli
+                ldy #>oscli
+                jsr for_each_cmd
+
+booted:
+                pla
+                tay
+                pla
+                rts
+                .pend
+
+;-------------------------------------------------------------------------
+
+for_each_cmd: .proc
+                stx addr+0
+                sty addr+1
+                
+                ldx #0
+loop:
+                txa
+                pha
+                
+                lda addr+0
+                pha
+                
+                lda addr+1
+                pha
+
+                ldy cmds.h,x
+
+                lda cmds.l,x
+                tax
+
+                jsr call_addr
+
+                pla
+                sta addr+1
+
+                pla
+                sta addr+0
+
+                pla
+                tax
+
+                inx
+                cpx #cmds.num
+                bne loop
+
+                rts
+
+call_addr:
+                jmp (addr)
+                .pend
+
+;-------------------------------------------------------------------------
+
+svc_help: .proc
+                pha
+                tya
+                pha
+
+                lda ($f2),y
+                cmp #13
+                bne check_topic
+
+no_topic:
+                ldy #rom_copyright-rom_name
+                jsr print_rom_name
+                jsr print_2_spaces
+                ldy #rom_version-rom_name
+                jsr print_rom_name
+                jmp done
+
+check_topic:
+
+                ldx #0
+                bit rom_copyright+1 ;'C'=$43 - set V - don't allow
+                                    ;0-char abbreviations
+loop:
+                lda rom_name,x
+                beq maybe
+                
+                lda ($f2),y
+                bvs check_char
+
+                cmp #'.'
+                beq yes
+
+check_char:
+                clv
+                and #$df
+                cmp rom_name,x
+                bne done
+
+                bvs next
+
+next:
+                iny
+                inx
+                bne loop
+
+maybe:
+                lda ($f2),y
+                cmp #13
+                bne done
+
+yes:
+                ldy #rom_copyright-rom_name
+                jsr print_rom_name
+                
+                ldx #<print_cmd
+                ldy #>print_cmd
+                jsr for_each_cmd
+                
+done:
+                pla
+                tay
+                pla
+
+                jmp svc.done
+                .pend
+                
+;-------------------------------------------------------------------------
+
+print_rom_name: .proc
+                ldx #0
+print_name_loop:
+                lda rom_name,x
+                bne +
+                lda #32
++
+                jsr oswrch
+                inx
+                dey
+                bne print_name_loop
+                jmp osnewl
+                .pend
+
+;-------------------------------------------------------------------------
+
+print_rom_name_char: .proc
+                cmp #0
+                bne +
+                lda #32
++
+                jmp oswrch
+                .pend
+                
+;-------------------------------------------------------------------------
+
+print_2_spaces: .proc
+                lda #' '
+                jsr oswrch
+                jmp oswrch
+                .pend
+                
+;-------------------------------------------------------------------------
+
+print_cmd: .proc
+                jsr print_2_spaces
+
+                lda #'*'
+                jsr oswrch
+
+                stx addr+0
+                sty addr+1
+                ldy #0
+loop:
+                lda (addr),y
+                jsr osasci
+                iny
+                cmp #13
+                bne loop
+
+                rts
+                .pend
+
+;-------------------------------------------------------------------------
+
+                .include ".build/cmds.s65"
