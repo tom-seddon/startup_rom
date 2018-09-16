@@ -71,7 +71,11 @@ rom_copyright:
 ;-------------------------------------------------------------------------
 
 svc: .proc
-                cmp #3
+                ; The ROM autoboot call (A=3) is swallowed by
+                ; whichever ROM claims it, so use the private
+                ; workspace claim (A=2) instead. That's always passed
+                ; on.
+                cmp #2
                 beq svc_boot
 
                 cmp #9
