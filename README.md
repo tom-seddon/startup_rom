@@ -58,7 +58,10 @@ The ROM is perfectly usable just as is, but being <0.5K it's a bit of
 a waste of a ROM bank. It's therefore intended to be added to another
 ROM as a
 [relocatable sideways RAM module](http://mdfs.net/Software/BBC/Modules/ModWriting).
+(I have it added to a filing system, along with the Tube host code.)
 
-If you have `smload_make_reloc` on `PATH`, a
+If you have
+[`smload_make_reloc`](https://github.com/tom-seddon/beeb/blob/master/smload_make_reloc.py)
+on `PATH`, a
 [relocatable module](http://mdfs.net/Software/BBC/Modules/ModWriting)
 will be built too: `.build/.tmp/startup_module.rom`.
