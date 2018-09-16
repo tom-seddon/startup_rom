@@ -17,6 +17,7 @@ build:
 	$(TASS) startup.s65 -L$(TMP)/startup_8100.lst -o$(TMP)/startup_8100.rom "-DVERSION=\"$(VER)\"" '-DORIGIN=$$8100'
 	$(CP) $(TMP)/startup_8000.rom $(DEST)
 	$(TOUCH) $(DEST).inf
+	which smload_make_reloc && smload_make_reloc -v -o $(TMP)/startup_module.rom $(TMP)/startup_8000.rom $(TMP)/startup_8100.rom
 
 .PHONY:clean
 clean:
